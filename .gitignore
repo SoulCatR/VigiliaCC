@@ -1,0 +1,29 @@
+# Entornos virtuales
+venv/
+.venv/
+**/venv/
+**/.venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Archivos pesados
+*.rar
+*.zip
+*.7z
+
+# IA / modelos
+*.pt
+*.h5
+*.onnx
+
+# Node (frontend)
+node_modules/
+dist/
+
+# Sistema
+.DS_Store
+Thumbs.db

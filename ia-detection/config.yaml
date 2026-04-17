@@ -1,0 +1,24 @@
+# =============================================
+# ARCHIVO: ia-detection/config.yaml
+# Configuración de Dataset para YOLOv5
+# =============================================
+"""
+# Dataset Configuration para YOLOv5
+# VigiliaCC - Detección de Comportamientos Sospechosos
+
+# Rutas (usar barras normales / incluso en Windows)
+path: data  # raíz del dataset
+train: train/images  # carpeta de entrenamiento
+val: val/images      # carpeta de validación
+
+# Clases (ajustar según tu dataset)
+nc: 3  # número de clases
+
+names:
+  0: persona_sospechosa
+  1: objeto_abandonado
+  2: aglomeracion
+
+# Configuración de entrenamiento
+download: False  # no descargar dataset automáticamente
+"""
