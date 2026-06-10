@@ -13,7 +13,13 @@ CORS(app)
 
 # Cargar modelo YOLOv5
 print("🔄 Cargando modelo YOLOv5...")
-model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True)
+model = torch.hub.load(
+    'ultralytics/yolov5:v7.0',
+    'yolov5s',
+    pretrained=True,
+    #force_reload=True, --> Solo se usa x 1era. vez, para descargar - era solo para limpiar el caché roto.
+    trust_repo=True
+)
 model.conf = 0.5
 print("✅ Modelo YOLOv5 cargado exitosamente")
 

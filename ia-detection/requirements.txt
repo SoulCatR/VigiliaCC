@@ -12,6 +12,8 @@ opencv-python==4.8.1.78
 # ===== YOLO v5 =====
 # NO instalar ultralytics para YOLOv5
 # YOLOv5 se descarga automáticamente vía torch.hub
+# Se usa una versión estable desde api.py:
+# torch.hub.load('ultralytics/yolov5:v7.0', 'yolov5s', pretrained=True)
 
 # ===== API Flask =====
 flask==3.0.0
@@ -24,5 +26,15 @@ pillow==10.1.0
 numpy==1.24.3
 pandas==2.1.3
 
-# ===== Opcional (para mejor rendimiento) =====
-# psutil==5.9.6
+# ===== Dependencias auxiliares de YOLOv5 =====
+PyYAML==6.0.1
+matplotlib==3.8.2
+contourpy==1.2.1
+tqdm==4.66.1
+scipy==1.11.4
+seaborn==0.13.0
+ipython==8.18.1
+gitpython==3.1.50
+
+# ===== Métricas del sistema =====
+psutil==5.9.6
