@@ -84,9 +84,9 @@ export default function WebcamStream({ cameraId, deviceId, width = 640, height =
         setIsLoading(false);
         setError('');
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error(`❌ Error accediendo a webcam ${cameraId}:`, err);
-      setError(err.message || 'No se pudo acceder a la cámara');
+      setError(err instanceof Error ? err.message : 'No se pudo acceder a la cámara');
       setIsLoading(false);
     }
   }, [cameraId, deviceId, width, height]);
@@ -121,6 +121,12 @@ export default function WebcamStream({ cameraId, deviceId, width = 640, height =
 
       canvas.width = captureWidth;
       canvas.height = captureHeight;
+
+      if (captureWidth === 0 || captureHeight === 0) {
+        console.warn(`⚠️ Canvas sin dimensiones, saltando frame cámara ${cameraId}`);
+        return;
+      }
+
       ctx.drawImage(video, 0, 0, captureWidth, captureHeight);
 
       if (overlayCanvasRef.current) {
@@ -137,6 +143,8 @@ export default function WebcamStream({ cameraId, deviceId, width = 640, height =
         image: imageBase64,
         camera_id: cameraId || 0,
       });
+
+      if (!mountedRef.current) return;
 
       console.log(`📦 Respuesta completa del backend:`, response.data);
 
@@ -212,9 +220,14 @@ export default function WebcamStream({ cameraId, deviceId, width = 640, height =
         setCurrentCategory(null);
         setCurrentSeverity(null);
       }
-    } catch (error: any) {
-      console.error(`❌ Error en detección:`, error);
-      console.error(`❌ Detalles del error:`, error.response?.data || error.message);
+    } catch (err) {
+      console.error(`❌ Error en detección:`, err);
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosErr = err as { response?: { data?: unknown }; message?: string };
+        console.error(`❌ Detalles:`, axiosErr.response?.data ?? axiosErr.message);
+      } else if (err instanceof Error) {
+        console.error(`❌ Detalles:`, err.message);
+      }
     } finally {
       isDetectingRef.current = false;
     }

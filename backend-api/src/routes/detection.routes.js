@@ -1,13 +1,13 @@
 // =============================================
 // ARCHIVO: backend-api/src/routes/detection.routes.js
 // Proxy entre Frontend y Python (YOLOv5)
+// Centraliza creación de alertas automáticas (HU028, HU029, HU030)
 // =============================================
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 const pool = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
-
 const fs = require('fs');
 const path = require('path');
 
@@ -18,8 +18,10 @@ if (!fs.existsSync(CAPTURES_DIR)) {
     console.log('📁 Carpeta captures/ creada');
 }
 
-// URL del backend Python (ajusta según tu configuración)
+// URL del backend Python
 const PYTHON_API_URL = process.env.PYTHON_API_URL || 'http://localhost:5000';
+
+
 
 /**
  * @swagger
@@ -64,7 +66,7 @@ router.post('/', authenticateToken, async (req, res) => {
         
         const pythonResponse = await axios.post(
             `${PYTHON_API_URL}/detect`,
-            { image },
+            { image, camera_id },
             { 
                 timeout: 10000, // 10 segundos timeout
                 headers: {
@@ -79,39 +81,52 @@ router.post('/', authenticateToken, async (req, res) => {
         const detections = pythonResponse.data.detections || [];
 
         // ✅ Crear alertas automáticas cuando detecta personas con alta confianza
-        const criticalDetections = detections.filter(
-            det => det.label === 'person' && det.confidence > 0.70
+        //const criticalDetections = detections.filter(
+        const personDetections = detections.filter(
+            det => det.class === 'person' && det.confidence > 0.70
         );
 
-        if (criticalDetections.length > 0 && camera_id) {
+        //if (criticalDetections.length > 0 && camera_id) {
+        if (personDetections.length > 0 && camera_id) {
             try {
                 // Obtener el category_id de "Aglomeración" o "Merodeo"
-                const categoryName = criticalDetections.length > 3 
-                    ? 'Aglomeración'
-                    : 'Merodeo';
+                // Aglomeración = 3 o más personas
+                // Merodeo = 1 o 2 personas con confianza > 0.70
+                const primaryDetection = pythonResponse.data.primary_detection || null;
+
+                const categoryId = primaryDetection?.category_id 
+                    || (personDetections.length >= 3 ? 5 : 2);
+
+                const categoryLabel = primaryDetection?.category_name 
+                    || (personDetections.length >= 3 ? 'Aglomeración' : 'Merodeo');
 
                 const categoryResult = await pool.query(
-                    'SELECT id FROM alert_categories WHERE name = $1',
-                    [categoryName]
+                    'SELECT id FROM alert_categories WHERE id = $1',
+                    [categoryId]
                 );
 
                 if (categoryResult.rows.length > 0) {
                     const categoryId = categoryResult.rows[0].id;
-                    const maxConfidence = Math.max(...criticalDetections.map(d => d.confidence));
+                    //const maxConfidence = Math.max(...criticalDetections.map(d => d.confidence));
+                    const maxConfidence = Math.max(...personDetections.map(d => d.confidence));
+
                     // ✅ GUARDAR IMAGEN CAPTURADA
                     let imagePath = null;
                     try {
                         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
                         const filename = `alert_cam${camera_id}_${timestamp}.jpg`;
                         const fullPath = path.join(CAPTURES_DIR, filename);
-                        
                         // Obtener la imagen del request original
-                        if (image) {
+                        /* if (image) {
                             const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
                             fs.writeFileSync(fullPath, base64Data, 'base64');
                             imagePath = `/captures/${filename}`;
                             console.log(`📸 Imagen guardada: ${filename}`);
-                        }
+                        } */
+                        const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
+                        fs.writeFileSync(fullPath, base64Data, 'base64');
+                        imagePath = `/captures/${filename}`;
+                        console.log(`📸 Imagen guardada: ${filename}`);
                     } catch (imageError) {
                         console.error('❌ Error guardando imagen:', imageError.message);
                     }
@@ -123,19 +138,25 @@ router.post('/', authenticateToken, async (req, res) => {
                         [camera_id, categoryId, maxConfidence, imagePath]
                     );
 
-                    console.log(`🚨 Alerta creada: ${categoryName} en cámara ${camera_id} (${criticalDetections.length} personas)`);
+                    console.log(`🚨 Alerta creada: ${categoryLabel} en cámara ${camera_id} (${personDetections.length} persona(s), confianza: ${(maxConfidence * 100).toFixed(0)}%)`);
+                } else {
+                    console.warn(`⚠️  Categoría '${categoryLabel}' no encontrada en alert_categories`);
                 }
-            } catch (error) {
-                console.error('❌ Error creando alerta:', error.message);
-                // No fallar la detección si falla crear la alerta
+            } catch (alertError) {
+                // No se cancela la respuesta de detección si falla crear la alerta
+                console.error('❌ Error creando alerta:', alertError.message);
             }
         }
 
         res.json({
             success: true,
+            detected: pythonResponse.data.detected || false,          // ← NUEVO
             detections: detections,
+            count: detections.length,
+            image_with_boxes: pythonResponse.data.image_with_boxes || null,  // ← NUEVO
+            primary_detection: pythonResponse.data.primary_detection || null, // ← NUEVO
             detection_time_ms: detectionTime,
-            alerts_created: criticalDetections.length
+            alerts_created: personDetections.length > 0 ? 1 : 0
         });
 
     } catch (error) {
@@ -146,7 +167,7 @@ router.post('/', authenticateToken, async (req, res) => {
             return res.status(503).json({
                 success: false,
                 error: 'Python AI service is not available',
-                message: 'Asegúrate de que el backend Python esté corriendo en ' + PYTHON_API_URL
+                message: `Asegúrate de que el backend Python esté corriendo en ${PYTHON_API_URL}`
             });
         }
 
@@ -181,7 +202,6 @@ router.get('/status', async (req, res) => {
         const pythonResponse = await axios.get(`${PYTHON_API_URL}/health`, {
             timeout: 3000
         });
-
         res.json({
             status: 'ok',
             python_service: pythonResponse.data

@@ -17,15 +17,15 @@ model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True)
 model.conf = 0.5
 print("✅ Modelo YOLOv5 cargado exitosamente")
 
-# ✅ MAPEO CORRECTO - SIN "COMPORTAMIENTO SOSPECHOSO"
+# ✅ MAPEO CORRECTO - SIN "COMPORTAMIENTO SOSPECHOSO" - - alineado con alert_categories de la BD
 CATEGORY_MAPPING = {
     'person': {
-        'category_id': 2,  # loitering
+        'category_id': 2,   # loitering / merodeo
         'category_name': 'Merodeo',
         'severity': 'low'
     },
     'backpack': {
-        'category_id': 4,  # abandoned_object
+        'category_id': 4,   # abandoned_object
         'category_name': 'Objeto Abandonado',
         'severity': 'medium'
     },
@@ -69,11 +69,13 @@ SEVERITY_COLORS = {
 }
 
 def detect_crowd(detections):
-    """Detectar aglomeración (3+ personas)"""
+    """Detectar aglomeración (3+ personas)
+    Alineado con HU029: agrupación anómala >= 3 personas.
+    """
     person_count = sum(1 for det in detections if det['class'] == 'person')
     if person_count >= 3:
         return {
-            'category_id': 5,  # crowd
+            'category_id': 5,  # crowd / agrupación
             'category_name': 'Aglomeración',
             'severity': 'medium',
             'confidence': min(detections[0]['confidence'] + 0.05, 0.99) if detections else 0.8,
@@ -81,32 +83,34 @@ def detect_crowd(detections):
         }
     return None
 
-def save_alert_to_backend(camera_id, category_id, confidence, image_base64):
-    """Guardar alerta automáticamente cuando confidence > 0.7"""
-    try:
-        if confidence < 0.7:
-            print(f"⏭️ Confianza {confidence:.2f} < 0.7, no se guarda alerta")
-            return
-
-        # Enviar a backend Node.js
-        backend_url = 'http://localhost:3000/api/alerts'
-        
-        payload = {
-            'camera_id': camera_id,
-            'category_id': category_id,
-            'confidence': confidence,
-            'image': image_base64,
-            'status': 'pending'
-        }
-
-        response = requests.post(backend_url, json=payload, timeout=5)
-        
-        if response.status_code == 201:
-            print(f"✅ Alerta guardada automáticamente - Confianza: {confidence:.2f}")
-        else:
-            print(f"⚠️ Error al guardar alerta: {response.status_code}")
-    except Exception as e:
-        print(f"❌ Error guardando alerta: {str(e)}")
+# ── FIX 5: save_alert_to_backend DESACTIVADA ─────────────────────────────────
+# Esta función intentaba hacer POST a /api/alerts sin Bearer token,
+# lo que causaba un 401 Unauthorized en backend-api/src/routes/alert.routes.js.
+# Además duplicaba alertas con las que ya crea detection.routes.js.
+# La creación de alertas se centraliza en detection.routes.js (Node.js).
+#
+# def save_alert_to_backend(camera_id, category_id, confidence, image_base64):
+#     """Guardar alerta automáticamente cuando confidence > 0.7"""
+#     try:
+#         if confidence < 0.7:
+#             print(f"⏭️ Confianza {confidence:.2f} < 0.7, no se guarda alerta")
+#             return
+#         backend_url = 'http://localhost:3000/api/alerts'
+#         payload = {
+#             'camera_id': camera_id,
+#             'category_id': category_id,
+#             'confidence': confidence,
+#             'image': image_base64,
+#             'status': 'pending'
+#         }
+#         response = requests.post(backend_url, json=payload, timeout=5)
+#         if response.status_code == 201:
+#             print(f"✅ Alerta guardada - Confianza: {confidence:.2f}")
+#         else:
+#             print(f"⚠️ Error al guardar alerta: {response.status_code}")
+#     except Exception as e:
+#         print(f"❌ Error guardando alerta: {str(e)}")
+# ─────────────────────────────────────────────────────────────────────────────
 
 @app.route('/detect', methods=['POST'])
 def detect():
@@ -224,13 +228,13 @@ def detect():
         if primary_detection:
             response_data['primary_detection'] = primary_detection
             
-            # ✅ GUARDAR ALERTA AUTOMÁTICAMENTE si confidence > 0.7
+            """ # ✅ GUARDAR ALERTA AUTOMÁTICAMENTE si confidence > 0.7
             save_alert_to_backend(
                 camera_id,
                 primary_detection.get('category_id'),
                 max_confidence,
                 f'data:image/jpeg;base64,{img_base64}'
-            )
+            ) """
         
         print(f"✅ Detectados: {len(detections)} | Principal: {primary_detection.get('category_name', 'N/A') if primary_detection else 'N/A'}")
         

@@ -48,3 +48,40 @@ python detect_realtime.py
 ```cmd
 python train_model.py
 ```
+### ==================================================
+### Comandos para Correr IA + Backend + FrontEnd
+### Terminal 1: Python IA 
+### ==================================================
+
+cd ia-detection
+.\venv\Scripts\Activate.ps1
+python api.py
+```
+
+**✅ Deberías ver:**
+```
+============================================================
+🚀 VigiliaCC - API REST + YOLOv5
+============================================================
+✅ Modelo YOLOv5s preentrenado cargado
+📡 API disponible en: http://0.0.0.0:5000
+============================================================
+
+============================================================
+Terminal 2: Backend Node.js
+
+cd backend-api
+npm start
+```
+
+**✅ Deberías ver:**
+```
+🚀 Server running on port 3000
+📊 Database connected
+
+============================================================
+::--Terminal 3: Frontend Next.js 
+
+cd frontend-dashboard
+npm run dev
+```

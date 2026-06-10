@@ -13,6 +13,10 @@ opencv-python==4.8.1.78
 # NO instalar ultralytics para YOLOv5
 # YOLOv5 se descarga automáticamente vía torch.hub
 
+# ===== API Flask =====
+flask==3.0.0
+flask-cors==4.0.0
+
 # ===== Utilidades =====
 requests==2.31.0
 python-dotenv==1.0.0
